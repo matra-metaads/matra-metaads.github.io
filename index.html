@@ -132,7 +132,11 @@ tr:hover td{background:#FAFBFE}
     <div class="topbar">
       <button class="burger" onclick="document.getElementById('side').classList.toggle('closed')">☰</button>
       <h2 id="viewTitle">Dashboard Utama</h2>
-      <select id="period" onchange="setPeriod(this.value)" style="display:none"></select> <span class="hint" id="metaInfo"></span>
+      <select id="period" onchange="setPeriod(this.value)" style="display:none"></select>
+      <span id="customBox" style="display:none;align-items:center;gap:5px">
+        <input type="date" id="d1"> <span class="hint">s/d</span> <input type="date" id="d2">
+        <button class="btn" style="padding:6px 11px" onclick="applyCustomRange()">Terapkan</button>
+      </span> <span class="hint" id="metaInfo"></span>
     </div>
     <div id="content"><div class="loading"><div class="spin"></div><div>Menarik data live dari Meta Ads…<br><span class="mini" id="prog"></span></div></div></div>
   </main>
@@ -170,7 +174,7 @@ const ACCOUNTS = [
 ];
 const DAYS={today:1,yesterday:1,last_7d:7,last_14d:14,last_30d:30};
 let DATA=[], OFFDATA=[], BENCH=null, ADS_CACHE={}, CRE_CACHE={}, SALDO={}, openAcc={}, curView={type:"dash"};
-let charts=[];
+let charts=[]; let CURKEY=null;
 
 /* ================= UTIL ================= */
 const fmtRp=v=>v==null?"–":"Rp"+Math.round(v).toLocaleString("id-ID");
@@ -196,10 +200,14 @@ async function loadAll(){
   let cur = localStorage.getItem("ma_web_period"); if(!cur || !periods[cur]) cur = j.default || Object.keys(periods)[0];
   const sel = document.getElementById("period");
   if(sel){ sel.style.display=""; sel.innerHTML = Object.keys(periods).map(k=>'<option value="'+k+'"'+(k===cur?" selected":"")+'>'+esc(periods[k].label||k)+'</option>').join(""); }
-  applyPeriod(cur);
+  if(sel){ sel.innerHTML += '<option value="custom"'+(cur==="custom"?" selected":"")+'>🗓 Pilih tanggal…</option>'; }
+  META.dailyRows = ((j.daily&&j.daily.rows)||[]).map(r=>({d:r[0],cid:String(r[1]),spend:r[2],imp:r[3],clicks:r[4],hasil:r[5]}));
+  META.dailyCov = (j.daily&&j.daily.cov)||[];
+  if(cur==="custom"){ showCustom(); applyCustomRange(); } else applyPeriod(cur);
 }
 function applyPeriod(k){
   const p = META.periods[k]; if(!p) return;
+  CURKEY=k;
   localStorage.setItem("ma_web_period", k);
   window.PERIOD_DAYS = p.days || 7;
   DATA = (p.campaigns||[]).map(e=>({...e, grp:objGroup(e.obj), cpr:e.hasil>0? e.spend/e.hasil : (e.spend>0? null : 0)}));
@@ -209,7 +217,58 @@ function applyPeriod(k){
   const mi = document.getElementById("metaInfo"); if(mi) mi.textContent = "Update: " + (META.generated_at||"-");
   loadDeposits(); renderSidebar(); route();
 }
-function setPeriod(k){ applyPeriod(k) }
+function setPeriod(k){
+  if(k==="custom"){ showCustom(); applyCustomRange(); }
+  else { document.getElementById("customBox").style.display="none"; applyPeriod(k); }
+}
+function dailyBounds(){ const ds=META.dailyRows.map(r=>r.d); return ds.length? [ds[0], ds[ds.length-1]] : [null,null]; }
+function showCustom(){
+  const box=document.getElementById("customBox"); box.style.display="inline-flex";
+  const [mn,mx]=dailyBounds(); const d1=document.getElementById("d1"), d2=document.getElementById("d2");
+  if(mn){ d1.min=mn; d2.min=mn; d1.max=mx; d2.max=mx; }
+  d1.value = localStorage.getItem("ma_d1") || (mx? new Date(new Date(mx).getTime()-6*864e5).toISOString().slice(0,10) : "");
+  d2.value = localStorage.getItem("ma_d2") || mx || "";
+}
+function applyCustomRange(){
+  const d1=document.getElementById("d1").value, d2=document.getElementById("d2").value;
+  if(!d1||!d2||d1>d2){ return; }
+  localStorage.setItem("ma_web_period","custom"); localStorage.setItem("ma_d1",d1); localStorage.setItem("ma_d2",d2);
+  CURKEY="custom";
+  window.PERIOD_DAYS = Math.round((new Date(d2)-new Date(d1))/864e5)+1;
+  const inR = META.dailyRows.filter(r=>r.d>=d1&&r.d<=d2);
+  const agg={}; inR.forEach(r=>{const a=agg[r.cid]=agg[r.cid]||{spend:0,imp:0,clicks:0,hasil:0}; a.spend+=r.spend; a.imp+=r.imp; a.clicks+=r.clicks; a.hasil+=r.hasil;});
+  const base=(META.periods.last_30d||META.periods.last_7d||{campaigns:[]}).campaigns;
+  DATA = base.map(e=>{const a=agg[String(e.id)]||{spend:0,imp:null,clicks:null,hasil:0};
+    return {...e, grp:objGroup(e.obj), spend:a.spend, imp:a.imp, clicks:a.clicks, hasil:a.hasil,
+      reach:null, freq:null, p25:null,
+      ctr:(a.imp&&a.clicks!=null)? a.clicks/a.imp*100 : null,
+      cpc:(a.clicks)? a.spend/a.clicks : null,
+      cpm:(a.imp)? a.spend/a.imp*1000 : null,
+      cpr:a.hasil>0? a.spend/a.hasil : (a.spend>0? null : 0)};});
+  DATA.sort((a,b)=>b.spend-a.spend);
+  OFFDATA=(META.offs||[]).map(e=>({...e,grp:objGroup(e.obj)}));
+  BENCH=META.bench||{}; ADS_CACHE=META.ads||{}; CRE_CACHE=META.creatives||{};
+  const mi=document.getElementById("metaInfo");
+  if(mi)mi.textContent="Custom "+d1+" s/d "+d2+" · cakupan data harian: "+(META.dailyCov.length?META.dailyCov.length+" akun ("+META.dailyCov.join(", ")+")":"belum ada")+" — akun lain menyusul via update otomatis";
+  loadDeposits(); renderSidebar(); route();
+}
+function drawDaily(){
+  if(!META.dailyRows||!META.dailyRows.length) return;
+  const el=document.getElementById("c3"); if(!el) return;
+  let d1,d2;
+  if(CURKEY==="custom"){ d1=localStorage.getItem("ma_d1"); d2=localStorage.getItem("ma_d2"); }
+  else { const [mn,mx]=dailyBounds(); d2=mx; d1=new Date(new Date(mx).getTime()-(window.PERIOD_DAYS-1)*864e5).toISOString().slice(0,10); }
+  const byDay={};
+  META.dailyRows.filter(r=>r.d>=d1&&r.d<=d2).forEach(r=>{const b=byDay[r.d]=byDay[r.d]||{spend:0,hasil:0}; b.spend+=r.spend; b.hasil+=r.hasil;});
+  const days=Object.keys(byDay).sort();
+  if(!days.length) return;
+  charts.push(new Chart(el,{type:"bar",
+    data:{labels:days.map(d=>d.slice(5)),datasets:[
+      {label:"Spend (Rp)",data:days.map(d=>byDay[d].spend),backgroundColor:"#2E5FA3",yAxisID:"y",order:2},
+      {label:"Hasil",data:days.map(d=>byDay[d].hasil),type:"line",borderColor:"#27AE60",backgroundColor:"#27AE60",yAxisID:"y1",tension:.3,order:1}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{y:{ticks:{callback:v=>"Rp"+(v/1000).toFixed(0)+"rb"}},y1:{position:"right",grid:{drawOnChartArea:false}}}}}));
+}
 function refreshBench(){}
 function bench(g){return (BENCH&&BENCH[g])||{}}
 /* ================= SALDO (estimasi dari rata2 spend/hari) ================= */
@@ -356,6 +415,7 @@ function renderDash(){
   if(alerts.length>12)h+=`<p class="mini">+${alerts.length-12} alert lain di tabel bawah.</p>`;
   h+=`</div>`;
 
+  if(META.dailyRows&&META.dailyRows.length){h+=`<div class="card"><h3>📈 Progress Harian — Spend vs Hasil</h3><div class="chartbox"><canvas id="c3"></canvas></div><p class="mini" style="margin-top:6px">Cakupan: ${esc((META.dailyCov||[]).join(", "))} — akun lain otomatis masuk setelah update pagi.</p></div>`;}
   h+=`<div class="grid2">
     <div class="card"><h3>🍩 Distribusi Spend per Akun</h3><div class="chartbox"><canvas id="c1"></canvas></div></div>
     <div class="card"><h3>🏆 Biaya/Pesan vs KPI Terbaik (garis merah = KPI)</h3><div class="chartbox"><canvas id="c2"></canvas></div></div>
@@ -394,6 +454,7 @@ function renderDash(){
   const palette=["#2E5FA3","#4C8EDA","#27AE60","#F39C12","#E74C3C","#8E44AD","#16A085","#D35400","#7F8C8D","#2C3E50","#C0392B","#1ABC9C","#F1C40F","#9B59B6"];
   charts.push(new Chart(document.getElementById("c1"),{type:"doughnut",data:{labels:spenders.map(x=>x[0]),datasets:[{data:spenders.map(x=>x[1].spend),backgroundColor:palette}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:10,font:{size:10}}}},cutout:"55%"}}));
   charts.push(new Chart(document.getElementById("c2"),{type:"bar",data:{labels:best.map(d=>d.acct),datasets:[{label:"Biaya/Pesan",data:best.map(d=>Math.round(d.cpr)),backgroundColor:best.map(d=>{const b=bench(d.grp).cprMin||15000;return d.cpr<=b*1.05?"#27AE60":d.cpr<=b*1.6?"#F39C12":"#E74C3C"})}]},options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>"Rp"+(v/1000).toFixed(0)+"rb"}}}}}));
+  drawDaily();
 }
 
 /* ================= DETAIL CAMPAIGN ================= */
