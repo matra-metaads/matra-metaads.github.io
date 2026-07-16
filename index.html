@@ -117,6 +117,11 @@ tr:hover td{background:#FAFBFE}
  table{font-size:11px;min-width:640px}
  .ins{max-width:none}
 }
+
+.otag{display:inline-block;font-size:8.5px;font-weight:800;padding:1.5px 6px;border-radius:6px;letter-spacing:.04em;vertical-align:middle;white-space:nowrap;flex-shrink:0}
+.og-S{background:#E3F0FF;color:#2E5FA3}.og-T{background:#F3E8FF;color:#7D3CB5}.og-E{background:#E2F7F1;color:#0E7C66}.og-L{background:#FFF0E0;color:#B45309}.og-X{background:#EDF0F5;color:#6b7690}
+.side .og-S{background:rgba(76,142,218,.3);color:#BBD8FF}.side .og-T{background:rgba(155,89,182,.32);color:#E2C7F5}
+.side .og-E{background:rgba(22,160,133,.3);color:#A9EBDD}.side .og-L{background:rgba(230,126,34,.3);color:#FBD3AC}.side .og-X{background:rgba(255,255,255,.18);color:#C9D2E2}
 </style>
 </head>
 <body>
@@ -186,6 +191,7 @@ function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt
 async function callTool(tool,args){const r=await window.cowork.callMcpTool(tool,args);if(r.isError)throw new Error((r.content?.[0]?.text||"tool error").slice(0,200));return r.structuredContent??JSON.parse(r.content[0].text)}
 async function getEnts(args){const p=await callTool(T_ENT,args);return typeof p.ad_entities==="string"?JSON.parse(p.ad_entities):(p.ad_entities||[])}
 function objGroup(o){o=String(o||"").toUpperCase();if(/SALES|CONVERSION|MESSAGE/.test(o))return"KONVERSI / PESAN";if(/TRAFFIC|LINK_CLICK/.test(o))return"TRAFFIC";if(/ENGAGEMENT/.test(o))return"ENGAGEMENT";if(/LEAD/.test(o))return"LEADS";return"LAINNYA"}
+function objTag(grp){const m={"KONVERSI / PESAN":["SALES","og-S"],"TRAFFIC":["TRAFFIC","og-T"],"ENGAGEMENT":["ENGAGE","og-E"],"LEADS":["LEADS","og-L"]};const t=m[grp]||[String(grp||"?").slice(0,6),"og-X"];return '<span class="otag '+t[1]+'">'+t[0]+'</span>'}
 function mainResultLabel(g){return g==="KONVERSI / PESAN"?"Pesan / Konversi":g==="TRAFFIC"?"Kunjungan Profil":g==="ENGAGEMENT"?"Kunjungan / Interaksi":g==="LEADS"?"Leads":"Hasil"}
 
 /* ================= DATA (STATIS via data.json) ================= */
@@ -346,11 +352,11 @@ function renderSidebar(){
       h+=`<div class="subhead on">🟢 ACTIVE (${camps.length})</div>`;
       if(!camps.length)h+=`<div class="none">tidak ada campaign aktif</div>`;
       else camps.forEach(c=>{const an=analyze(c);const col=c.spend===0?"#9aa4b8":an.status.txt==="SESUAI KPI"?"#27AE60":an.status.txt==="DI BAWAH KPI"?"#F39C12":"#E74C3C";
-        h+=`<div class="sitem ${curView.type==='camp'&&curView.i===DATA.indexOf(c)?'on':''}" onclick="event.stopPropagation();go({type:'camp',i:${DATA.indexOf(c)}})" title="${esc(c.name)}"><span style="display:flex;gap:6px;align-items:center;min-width:0"><span class="dot" style="background:${col}"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name.slice(0,24))}${c.name.length>24?"…":""}</span></span></div>`;});
+        h+=`<div class="sitem ${curView.type==='camp'&&curView.i===DATA.indexOf(c)?'on':''}" onclick="event.stopPropagation();go({type:'camp',i:${DATA.indexOf(c)}})" title="${esc(c.name)}"><span style="display:flex;gap:6px;align-items:center;min-width:0"><span class="dot" style="background:${col}"></span>${objTag(c.grp)}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name.slice(0,20))}${c.name.length>20?"…":""}</span></span></div>`;});
       h+=`<div class="subhead off">⚫ OFF (${offs.length})</div>`;
       if(!offs.length)h+=`<div class="none">tidak ada campaign off</div>`;
       else offs.forEach(c=>{
-        h+=`<div class="sitem ${curView.type==='off'&&curView.i===OFFDATA.indexOf(c)?'on':''}" style="opacity:.65" onclick="event.stopPropagation();go({type:'off',i:${OFFDATA.indexOf(c)}})" title="${esc(c.name)}"><span style="display:flex;gap:6px;align-items:center;min-width:0"><span class="dot" style="background:#5a6b8c"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name.slice(0,24))}${c.name.length>24?"…":""}</span></span></div>`;});
+        h+=`<div class="sitem ${curView.type==='off'&&curView.i===OFFDATA.indexOf(c)?'on':''}" style="opacity:.65" onclick="event.stopPropagation();go({type:'off',i:${OFFDATA.indexOf(c)}})" title="${esc(c.name)}"><span style="display:flex;gap:6px;align-items:center;min-width:0"><span class="dot" style="background:#5a6b8c"></span>${objTag(c.grp)}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name.slice(0,20))}${c.name.length>20?"…":""}</span></span></div>`;});
     }
     h+=`</div>`;
   });
@@ -438,12 +444,12 @@ function renderDash(){
 
   h+=`<div class="card"><h3>🥇 Campaign dengan Hasil Terbanyak</h3><table><tr><th>#</th><th>Campaign</th><th>Akun</th><th class="num">Hasil</th><th>Jenis (per objective)</th><th class="num">Biaya/Hasil</th><th class="num">vs KPI</th></tr>`;
   topResults.forEach((d,i)=>{const an=analyze(d);
-    h+=`<tr><td>${i+1}</td><td><b>${esc(d.name.slice(0,45))}</b></td><td class="mini">${esc(d.acct)}</td><td class="num"><b>${fmtN(d.hasil)}</b></td><td class="mini">${esc(mainResultLabel(d.grp))}</td><td class="num">${fmtRp(d.cpr)}</td><td class="num"><span class="tag ${an.status.cls}">${an.ratio?("×"+an.ratio.toFixed(1)):"–"}</span></td></tr>`;});
+    h+=`<tr><td>${i+1}</td><td><b>${esc(d.name.slice(0,45))}</b></td><td class="mini">${esc(d.acct)}</td><td class="num"><b>${fmtN(d.hasil)}</b></td><td>${objTag(d.grp)}<div class="mini">${esc(mainResultLabel(d.grp))}</div></td><td class="num">${fmtRp(d.cpr)}</td><td class="num"><span class="tag ${an.status.cls}">${an.ratio?("×"+an.ratio.toFixed(1)):"–"}</span></td></tr>`;});
   h+=`</table></div>`;
 
   h+=`<div class="card"><h3>📋 Semua Campaign — Metrics vs KPI Historis + Insight</h3><table><tr><th>Campaign / Akun</th><th class="num">Spend</th><th class="num">Hasil</th><th>Metrics vs KPI (merah = di bawah rekor 3 th)</th><th>Status</th><th>Insight — langkah memaksimalkan</th></tr>`;
   DATA.forEach(d=>{const an=analyze(d);const chips=kpiChips(d);
-    h+=`<tr><td style="min-width:150px"><b>${esc(d.name.slice(0,40))}</b><br><span class="mini">${esc(d.acct)} · ${esc(mainResultLabel(d.grp))}</span></td>
+    h+=`<tr><td style="min-width:150px"><b>${esc(d.name.slice(0,40))}</b><br>${objTag(d.grp)} <span class="mini">${esc(d.acct)}</span></td>
     <td class="num">${fmtRp(d.spend)}</td><td class="num"><b>${fmtN(d.hasil)}</b></td>
     <td style="min-width:220px">${chips.map(c=>`<span class="chip ${c.ok?'good':'bad'}">${c.ok?"✓":"✗"} ${c.lbl}: ${c.val} <small>KPI ${c.kpi}</small></span>`).join("")||'<span class="mini">–</span>'}</td>
     <td><span class="tag ${an.status.cls}">${an.status.txt}</span></td>
@@ -463,7 +469,7 @@ async function renderCamp(d){
   const an=analyze(d),chips=kpiChips(d),ret=(d.p25!=null&&d.imp)?d.p25/d.imp:null;
   let h=`<div class="crumb" onclick="go({type:'dash'})">← Dashboard Utama</div>
   <div class="card"><h3>${esc(d.name)}</h3>
-  <p class="mini">Akun: <b>${esc(d.acct)}</b> · BM: ${esc(d.bm)} · Objective: <b>${esc(d.obj)}</b> → hasil utama: <b>${esc(mainResultLabel(d.grp))}</b> · <span class="tag ${an.status.cls}">${an.status.txt}</span></p>
+  <p class="mini">Akun: <b>${esc(d.acct)}</b> · BM: ${esc(d.bm)} · Objective: ${objTag(d.grp)} <b>${esc(d.obj)}</b> → hasil utama: <b>${esc(mainResultLabel(d.grp))}</b> · <span class="tag ${an.status.cls}">${an.status.txt}</span></p>
   <div class="dl" style="margin-top:12px">
     <div class="kpi"><div class="l">Spend</div><div class="v">${fmtRp(d.spend)}</div></div>
     <div class="kpi k-green"><div class="l">${esc(mainResultLabel(d.grp))}</div><div class="v">${fmtN(d.hasil)}</div><div class="s">${esc(d.resLabel.slice(0,26))}</div></div>
