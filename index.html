@@ -132,7 +132,7 @@ tr:hover td{background:#FAFBFE}
     <div class="topbar">
       <button class="burger" onclick="document.getElementById('side').classList.toggle('closed')">☰</button>
       <h2 id="viewTitle">Dashboard Utama</h2>
-      <span class="hint" id="metaInfo"></span>
+      <select id="period" onchange="setPeriod(this.value)" style="display:none"></select> <span class="hint" id="metaInfo"></span>
     </div>
     <div id="content"><div class="loading"><div class="spin"></div><div>Menarik data live dari Meta Ads…<br><span class="mini" id="prog"></span></div></div></div>
   </main>
@@ -190,14 +190,26 @@ async function loadAll(){
   document.getElementById("content").innerHTML='<div class="loading"><div class="spin"></div>Memuat data…</div>';
   let j; try{ j=await fetch('data.json?t='+Date.now()).then(r=>r.json()); }
   catch(e){ document.getElementById("content").innerHTML='<div class="loading">Gagal memuat data.json — coba refresh.</div>'; return; }
-  META=j; window.PERIOD_DAYS=j.days||7;
-  DATA=(j.campaigns||[]).map(e=>({...e,grp:objGroup(e.obj),cpr:e.hasil>0?e.spend/e.hasil:(e.spend>0?null:0)}));
+  META=j;
+  const periods = j.periods || {"last_7d":{label:j.period_label||"7 hari terakhir",days:j.days||7,campaigns:j.campaigns||[]}};
+  META.periods = periods;
+  let cur = localStorage.getItem("ma_web_period"); if(!cur || !periods[cur]) cur = j.default || Object.keys(periods)[0];
+  const sel = document.getElementById("period");
+  if(sel){ sel.style.display=""; sel.innerHTML = Object.keys(periods).map(k=>'<option value="'+k+'"'+(k===cur?" selected":"")+'>'+esc(periods[k].label||k)+'</option>').join(""); }
+  applyPeriod(cur);
+}
+function applyPeriod(k){
+  const p = META.periods[k]; if(!p) return;
+  localStorage.setItem("ma_web_period", k);
+  window.PERIOD_DAYS = p.days || 7;
+  DATA = (p.campaigns||[]).map(e=>({...e, grp:objGroup(e.obj), cpr:e.hasil>0? e.spend/e.hasil : (e.spend>0? null : 0)}));
   DATA.sort((a,b)=>b.spend-a.spend);
-  OFFDATA=(j.offs||[]).map(e=>({...e,grp:objGroup(e.obj)}));
-  BENCH=j.bench||{}; ADS_CACHE=j.ads||{}; CRE_CACHE=j.creatives||{};
-  const mi=document.getElementById("metaInfo"); if(mi)mi.textContent="Periode: "+(j.period_label||"7 hari")+" · Update: "+(j.generated_at||"-");
+  OFFDATA = (META.offs||[]).map(e=>({...e, grp:objGroup(e.obj)}));
+  BENCH = META.bench||{}; ADS_CACHE = META.ads||{}; CRE_CACHE = META.creatives||{};
+  const mi = document.getElementById("metaInfo"); if(mi) mi.textContent = "Update: " + (META.generated_at||"-");
   loadDeposits(); renderSidebar(); route();
 }
+function setPeriod(k){ applyPeriod(k) }
 function refreshBench(){}
 function bench(g){return (BENCH&&BENCH[g])||{}}
 /* ================= SALDO (estimasi dari rata2 spend/hari) ================= */
