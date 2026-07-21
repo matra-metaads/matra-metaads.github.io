@@ -178,7 +178,7 @@ async function loadAll(){
   META=j;
   const periods = j.periods || {"last_7d":{label:j.period_label||"7 hari terakhir",days:j.days||7,campaigns:j.campaigns||[]}};
   META.periods = periods;
-  { const accMap={}; Object.keys(periods).forEach(k=>{ (periods[k].campaigns||[]).forEach(c=>{ if(c.acctId && !accMap[c.acctId]) accMap[c.acctId]={id:c.acctId,n:c.acct,bm:c.bm}; }); }); ACCOUNTS = Object.values(accMap); }
+  { const accMap={}; Object.keys(periods).forEach(k=>{ (periods[k].campaigns||[]).forEach(c=>{ if(c.acctId && !accMap[c.acctId] && c.acct && !c.acct.includes('(Read-Only)')) accMap[c.acctId]={id:c.acctId,n:c.acct,bm:c.bm}; }); }); ACCOUNTS = Object.values(accMap); }
   let cur = localStorage.getItem("ma_web_period"); if(!cur || !periods[cur]) cur = j.default || Object.keys(periods)[0];
   const sel = document.getElementById("period");
   if(sel){ sel.style.display=""; sel.innerHTML = Object.keys(periods).map(k=>'<option value="'+k+'"'+(k===cur?" selected":"")+'>'+esc(periods[k].label||k)+'</option>').join(""); }
