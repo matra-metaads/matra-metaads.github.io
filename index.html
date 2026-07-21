@@ -151,32 +151,7 @@ tr:hover td{background:#FAFBFE}
 /* ================= KONFIG ================= */
 const T_ENT = "mcp__05b282c1-0604-428a-8743-ab2eb1ea172d__ads_get_ad_entities";
 const T_CRE = "mcp__05b282c1-0604-428a-8743-ab2eb1ea172d__ads_get_creatives";
-const ACCOUNTS = [
- {id:"2042606409641383",n:"mits bekasi",bm:"Mits bekasi"},
- {id:"359291288835835",n:"Marco Digital Partner",bm:"Dezainla Lampung"},
- {id:"384735066169027",n:"Sewain.Plg",bm:"PALMART"},
- {id:"471872683854124",n:"Pempek Arridho",bm:"Pempek Arridho"},
- {id:"743985850072127",n:"Casa Grande",bm:"propertiandalan.official"},
- {id:"625642268907452",n:"GSC Palembang",bm:"Garuda Sriwijaya LLG"},
- {id:"446854857463883",n:"Ar raudhah",bm:"Palembang Berdaya"},
- {id:"1586327161793436",n:"BEI",bm:"SEANJOSHOPE"},
- {id:"844052517432490",n:"Toko Baju Sadira",bm:"Grosir Kaos Plg"},
- {id:"893185985622180",n:"Elco Mebeler",bm:"Eliterior Design"},
- {id:"447038580990478",n:"SKY Ads",bm:"PT Sultan Kreasi Yatra"},
- {id:"1130873525267013",n:"MITS Palembang",bm:"MDP"},
- {id:"571133569142790",n:"LRT. Ad",bm:"Marco Digital Partner"},
- {id:"2092078241237618",n:"MITS Lampung",bm:"potretpro.id"},
- {id:"517899474245276",n:"Sriwijaya Container",bm:"M. Rizki Saputra"},
- {id:"1344802100233726",n:"MITS Depok",bm:"MARCO"},
- {id:"1992458437847401",n:"Dezainla Palembang",bm:"Dezainla Creative Group"},
- {id:"1751468265792461",n:"Free Webinar",bm:"Mentoring Skill"},
- {id:"1102823551745916",n:"Khitan Space",bm:"Khitan Space"},
- {id:"1320443423106973",n:"ciptahandal.construction",bm:"ciptahandal"},
- {id:"4280909835483535",n:"Soto Abah Opan",bm:"sotoabahopan"},
- {id:"976116385181431",n:"Pusat Aki Palembang",bm:"Aki Murah Palembang"},
- {id:"1549292610159543",n:"Supertex Palembang Baru",bm:"supertex.palembang"},
- {id:"71219896",n:"Akun personal",bm:"(tanpa BM)"},
-];
+let ACCOUNTS = [];
 const DAYS={today:1,yesterday:1,last_7d:7,last_14d:14,last_30d:30};
 let DATA=[], OFFDATA=[], BENCH=null, ADS_CACHE={}, CRE_CACHE={}, SALDO={}, openAcc={}, curView={type:"dash"};
 let charts=[]; let CURKEY=null;
@@ -203,6 +178,7 @@ async function loadAll(){
   META=j;
   const periods = j.periods || {"last_7d":{label:j.period_label||"7 hari terakhir",days:j.days||7,campaigns:j.campaigns||[]}};
   META.periods = periods;
+  { const accMap={}; Object.keys(periods).forEach(k=>{ (periods[k].campaigns||[]).forEach(c=>{ if(c.acctId && !accMap[c.acctId]) accMap[c.acctId]={id:c.acctId,n:c.acct,bm:c.bm}; }); }); ACCOUNTS = Object.values(accMap); }
   let cur = localStorage.getItem("ma_web_period"); if(!cur || !periods[cur]) cur = j.default || Object.keys(periods)[0];
   const sel = document.getElementById("period");
   if(sel){ sel.style.display=""; sel.innerHTML = Object.keys(periods).map(k=>'<option value="'+k+'"'+(k===cur?" selected":"")+'>'+esc(periods[k].label||k)+'</option>').join(""); }
