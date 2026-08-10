@@ -254,11 +254,35 @@ function drawDaily(){
 function refreshBench(){}
 function bench(g){return (BENCH&&BENCH[g])||{}}
 /* ================= SALDO (estimasi dari rata2 spend/hari) ================= */
-function loadDeposits(){try{SALDO=JSON.parse(localStorage.getItem("ma_saldo")||"{}")}catch(e){SALDO={}}
+function loadDeposits(){
+  try{SALDO=JSON.parse(localStorage.getItem("ma_saldo")||"{}")}catch(e){SALDO={}}
+  Object.keys(SALDO).forEach(id=>{const s=SALDO[id];
+    if(s && s.amt && s.date && !s.topups){ s.topups=[{amt:s.amt,date:s.date}]; delete s.amt; delete s.date; }
+  });
   const rate={}; DATA.forEach(d=>{rate[d.acctId]=(rate[d.acctId]||0)+d.spend/(window.PERIOD_DAYS||7)});
-  Object.keys(SALDO).forEach(id=>{const s=SALDO[id];if(!s||!s.amt||!s.date){if(s)s.spent=null;return}
-    const days=Math.max(0,(Date.now()-new Date(s.date).getTime())/864e5);
-    s.spent=Math.round((rate[id]||0)*days); s.sisa=s.amt-s.spent; s.pct=s.amt?s.sisa/s.amt:0;});
+  Object.keys(SALDO).forEach(id=>{const s=SALDO[id];
+    if(!s||!s.topups||!s.topups.length){if(s)s.spent=null;return}
+    const total=s.topups.reduce((a,t)=>a+(t.amt||0),0);
+    const minDate=s.topups.reduce((m,t)=>!m||t.date<m?t.date:m,null);
+    const days=Math.max(0,(Date.now()-new Date(minDate).getTime())/864e5);
+    s.spent=Math.round((rate[id]||0)*days); s.sisa=total-s.spent; s.pct=total?s.sisa/total:0;
+  });
+}
+function totalDep(s){return (s&&s.topups?s.topups:[]).reduce((a,t)=>a+(t.amt||0),0)}
+function toggleAddForm(id){const el=document.getElementById("addform-"+id); if(el) el.style.display = el.style.display==="none"?"flex":"none";}
+function toggleHist(id){const el=document.getElementById("hist-"+id); if(el) el.style.display = el.style.display==="none"?"block":"none";}
+function addTopup(id){
+  const amtEl=document.getElementById("newamt-"+id), dateEl=document.getElementById("newdate-"+id);
+  const amt=parseFloat(amtEl.value)||0, date=dateEl.value||new Date().toISOString().slice(0,10);
+  if(amt<=0){alert("Isi nominal top-up dulu");return}
+  SALDO[id]=SALDO[id]||{}; SALDO[id].topups=SALDO[id].topups||[];
+  SALDO[id].topups.push({amt,date});
+  saveDeposits(); loadDeposits(); renderSaldo();
+}
+function removeTopup(id,idx){
+  if(!SALDO[id]||!SALDO[id].topups) return;
+  SALDO[id].topups.splice(idx,1);
+  saveDeposits(); loadDeposits(); renderSaldo();
 }
 function saveDeposits(){localStorage.setItem("ma_saldo",JSON.stringify(SALDO))}
 async function loadSaldoSpend(){loadDeposits()}
@@ -540,12 +564,18 @@ function renderSaldo(){
   let h=`<div class="crumb" onclick="go({type:'dash'})">← Dashboard Utama</div>
   <div class="card"><h3>💳 Monitoring Sisa Saldo per Ad Account</h3>
   <p class="mini" style="margin-bottom:10px">Meta tidak membuka data saldo via API, jadi masukkan <b>deposit awal + tanggalnya</b> sekali saja. Dashboard menghitung sisa = deposit − estimasi spend (rata-rata spend/hari × hari sejak deposit; diperbarui tiap pagi). 🔴 merah = sisa &lt; 20% → perlu deposit.</p>
-  <table><tr><th>Ad Account</th><th>Deposit Awal (Rp)</th><th>Tanggal Deposit</th><th class="num">Spend Sejak Deposit</th><th class="num">Sisa Saldo</th><th>Status</th></tr>`;
+  <table><tr><th>Ad Account</th><th>Total Deposit</th><th>Riwayat Top-up</th><th class="num">Spend Sejak Deposit</th><th class="num">Sisa Saldo</th><th>Status</th></tr>`;
   ACCOUNTS.forEach(a=>{const s=SALDO[a.id]||{};
     const rowStat=s.spent==null?'<span class="tag t-gray">belum diatur</span>':s.pct<0.2?'<span class="tag t-red">🔴 PERLU DEPOSIT</span>':s.pct<0.4?'<span class="tag t-amber">Siapkan top-up</span>':'<span class="tag t-green">Aman</span>';
     h+=`<tr><td><b>${esc(a.n)}</b><br><span class="mini">${esc(a.bm)}</span></td>
-    <td><input type="number" style="width:120px" value="${s.amt||""}" placeholder="cth 5000000" onchange="setDep('${a.id}','amt',this.value)"></td>
-    <td><input type="date" value="${s.date||""}" onchange="setDep('${a.id}','date',this.value)"></td>
+    <td><b>${s.topups&&s.topups.length?fmtRp(totalDep(s)):"–"}</b>
+    <div style="margin-top:4px"><button class="btn" style="padding:3px 8px;font-size:11px" onclick="toggleAddForm('${a.id}')">+ Tambah Saldo</button></div>
+    <div id="addform-${a.id}" style="display:none;margin-top:6px;gap:4px;flex-wrap:wrap;align-items:center">
+      <input type="number" id="newamt-${a.id}" placeholder="Nominal" style="width:100px;margin-right:4px">
+      <input type="date" id="newdate-${a.id}" value="${new Date().toISOString().slice(0,10)}" style="margin-right:4px">
+      <button class="btn" style="padding:3px 8px;font-size:11px" onclick="addTopup('${a.id}')">Simpan</button>
+    </div></td>
+    <td>${s.topups&&s.topups.length?`<span class="mini" style="cursor:pointer;text-decoration:underline" onclick="toggleHist('${a.id}')">${s.topups.length} kali top-up ▾</span><div id="hist-${a.id}" style="display:none;margin-top:4px">${s.topups.slice().reverse().map((t,ri)=>{const idx=s.topups.length-1-ri;return `<div class="mini">${t.date}: ${fmtRp(t.amt)} <span style="color:var(--red);cursor:pointer" onclick="removeTopup('${a.id}',${idx})">×</span></div>`}).join("")}</div>`:'<span class="mini">belum ada</span>'}</td>
     <td class="num">${s.spent!=null?fmtRp(s.spent):"–"}</td>
     <td class="num"><b style="color:${s.pct!=null&&s.pct<0.2?'var(--red)':'inherit'}">${s.sisa!=null?fmtRp(s.sisa):"–"}</b>${s.pct!=null?`<div class="bar"><i style="width:${Math.max(0,Math.min(100,s.pct*100))}%;background:${s.pct<0.2?'var(--red)':s.pct<0.4?'#F39C12':'var(--green)'}"></i></div>`:""}</td>
     <td>${rowStat}</td></tr>`;});
