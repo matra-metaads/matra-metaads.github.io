@@ -125,6 +125,15 @@ tr:hover td{background:#FAFBFE}
 </style>
 </head>
 <body>
+<div id="authGate" style="position:fixed;inset:0;background:#0F1B33;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;font-family:inherit">
+  <div style="background:#16264a;padding:32px 28px;border-radius:14px;max-width:320px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.4)">
+    <div style="font-weight:800;font-size:16px;margin-bottom:4px">Marco Digital Partner</div>
+    <div style="font-size:12px;color:#9fb0d0;margin-bottom:16px">Masukkan password untuk membuka dashboard</div>
+    <input type="password" id="authPass" placeholder="Password" style="width:100%;padding:10px 12px;border-radius:8px;border:none;font-size:14px;margin-bottom:10px;box-sizing:border-box" onkeydown="if(event.key==='Enter')checkAuth()">
+    <button onclick="checkAuth()" style="width:100%;padding:10px;border-radius:8px;border:none;background:#2E5FA3;color:#fff;font-weight:700;cursor:pointer">Masuk</button>
+    <div id="authErr" style="color:#FF8A8A;font-size:12px;margin-top:8px;display:none">Password salah, coba lagi.</div>
+  </div>
+</div>
 <div class="layout">
   <nav class="side" id="side">
     <div class="logo">
@@ -148,6 +157,24 @@ tr:hover td{background:#FAFBFE}
 </div>
 
 <script>
+function checkAuth(){const v=document.getElementById("authPass").value;if(v==="nextlevel123"){sessionStorage.setItem("ma_auth","1");document.getElementById("authGate").style.display="none";}else{document.getElementById("authErr").style.display="block";}}
+if(sessionStorage.getItem("ma_auth")==="1"){const g=document.getElementById("authGate");if(g)g.style.display="none";}
+function gateSaldo(){
+  if(sessionStorage.getItem("ma_saldo_auth")==="1"){renderSaldo();return;}
+  document.getElementById("viewTitle").textContent="Saldo Akun";
+  document.getElementById("content").innerHTML=`<div class="card" style="max-width:340px;margin:40px auto;text-align:center">
+    <div style="font-weight:800;margin-bottom:4px">Saldo Akun — Terkunci</div>
+    <div class="mini" style="margin-bottom:14px">Halaman ini butuh password terpisah</div>
+    <input type="password" id="saldoPass" placeholder="Password" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid #ccc;font-size:14px;margin-bottom:10px;box-sizing:border-box" onkeydown="if(event.key==='Enter')checkSaldoAuth()">
+    <button class="btn" onclick="checkSaldoAuth()" style="width:100%">Buka</button>
+    <div id="saldoErr" style="color:var(--red);font-size:12px;margin-top:8px;display:none">Password salah.</div>
+  </div>`;
+}
+function checkSaldoAuth(){
+  const v=document.getElementById("saldoPass").value;
+  if(v==="grow123"){sessionStorage.setItem("ma_saldo_auth","1");renderSaldo();}
+  else{document.getElementById("saldoErr").style.display="block";}
+}
 /* ================= KONFIG ================= */
 const T_ENT = "mcp__05b282c1-0604-428a-8743-ab2eb1ea172d__ads_get_ad_entities";
 const T_CRE = "mcp__05b282c1-0604-428a-8743-ab2eb1ea172d__ads_get_creatives";
@@ -369,7 +396,7 @@ function route(){charts.forEach(c=>c.destroy());charts=[];
   else if(curView.type==="camp")renderCamp(DATA[curView.i]);
   else if(curView.type==="off")renderOff(OFFDATA[curView.i]);
   else if(curView.type==="creative")renderCreative();
-  else if(curView.type==="saldo")renderSaldo();}
+  else if(curView.type==="saldo")gateSaldo();}
 
 /* ================= CAMPAIGN OFF ================= */
 function renderOff(c){
